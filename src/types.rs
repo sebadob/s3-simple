@@ -267,7 +267,7 @@ pub struct ListBucketResult {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct InitiateMultipartUploadResponse {
+pub(crate) struct InitiateMultipartUploadResponse {
     #[serde(rename = "Bucket")]
     _bucket: String,
     #[serde(rename = "Key")]

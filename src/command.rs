@@ -50,7 +50,7 @@ impl CompleteMultipartUploadData {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub enum Command<'a> {
+pub(crate) enum Command<'a> {
     HeadObject,
     CopyObject {
         from: &'a str,
@@ -58,7 +58,6 @@ pub enum Command<'a> {
     DeleteObject,
     DeleteObjectTagging,
     GetObject,
-    // GetObjectTorrent,
     GetObjectRange {
         start: u64,
         end: Option<u64>,
