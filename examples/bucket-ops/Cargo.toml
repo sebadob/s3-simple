@@ -1,0 +1,11 @@
+[package]
+name = "bucket-ops"
+version = "0.1.0"
+edition = "2021"
+authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
+license = "Apache-2.0"
+
+[dependencies]
+dotenvy = "0.15.7"
+s3-simple = { path = "../.." }
+tokio = { version = "1.37.0", features = ["full"] }
