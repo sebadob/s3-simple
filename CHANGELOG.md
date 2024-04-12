@@ -6,6 +6,7 @@
 - internal code cleanup and reduced debug logging
 - optimized ci / test recipes to not fail with multiple shared test-runtimes in parallel
 - improved docs and readme
+- removed accidentally added `examples/target` folder from git 
 
 ## v0.1.0
 
