@@ -1,5 +1,5 @@
 use futures_util::stream::StreamExt;
-use s3_simple::prelude::*;
+use s3_simple::*;
 use std::os::unix::fs::MetadataExt;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;

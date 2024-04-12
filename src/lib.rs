@@ -1,10 +1,16 @@
+// Copyright 2024 Sebastian Dobe <sebastiandobe@mailbox.org>
+
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 
-use crate::error::S3Error;
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::env;
 
+pub use crate::bucket::{Bucket, BucketOptions};
+pub use crate::credentials::{AccessKeyId, AccessKeySecret, Credentials};
+pub use crate::error::S3Error;
+pub use crate::types::{HeadObjectResult, Object, PutStreamResponse};
 pub use reqwest::Response as S3Response;
 pub use reqwest::StatusCode as S3StatusCode;
 
@@ -13,7 +19,6 @@ mod command;
 mod constants;
 mod credentials;
 mod error;
-pub mod prelude;
 mod signature;
 mod types;
 

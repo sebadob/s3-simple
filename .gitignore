@@ -5,3 +5,4 @@ Cargo.lock
 test_data
 test_files
 minio_data
+examples/*/target

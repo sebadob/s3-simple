@@ -1,4 +1,4 @@
-use s3_simple::prelude::*;
+use s3_simple::*;
 
 #[tokio::main]
 async fn main() -> Result<(), S3Error> {

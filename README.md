@@ -33,7 +33,7 @@ they are often running on not that powerful big servers.
 - only accepts connections via access key and secret
 - the following currently implemented operations:
     - HEAD object for metadata
-    - GET object - `S3Response` is a wrapper around `reqwest::resposne`, so you can decide yourself if you
+    - GET object - `S3Response` is a wrapper around `reqwest::Response`, so you can decide yourself if you
       want it in-memory or convert it to a stream
     - GET object range for partial downloads
     - DELETE an object
@@ -43,3 +43,21 @@ they are often running on not that powerful big servers.
     - S3 internal copy of objects
 - all operations are tested against [Minio](https://github.com/minio/minio)
   and [Garage](https://git.deuxfleurs.fr/Deuxfleurs/garage) 
+
+## How to use it
+
+Take a look at the [examples](https://github.com/sebadob/s3-simple/tree/main/examples), but basically:
+
+```rust
+let bucket = Bucket::try_from_env().expect("env vars to be set");
+
+// upload
+let res = bucket.put("test.txt", b"Hello S3").await?;
+assert!(res.status().is_success());
+
+// get it back
+let res = bucket.get("test.txt").await?;
+assert!(res.status().is_success());
+let body = res.bytes().await?;
+assert_eq!(body.as_ref(), b"Hello S3");
+```
