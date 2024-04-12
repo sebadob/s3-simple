@@ -1,9 +1,15 @@
 [package]
 name = "s3-simple"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
+rust-version = "1.70.0"
 authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
 license = "Apache-2.0"
+categories = ["api-bindings"]
+keywords = ["async", "aws", "client", "s3", "tokio"]
+description = "simple encrypted (streaming) values"
+readme = "README.md"
+repository = "https://github.com/sebadob/s3-simple"
 
 [dependencies]
 base64 = "0.22.0"
