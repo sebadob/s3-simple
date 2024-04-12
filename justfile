@@ -24,7 +24,7 @@ check:
     cargo update
     cd examples/bucket-ops
     cargo +nightly clippy -- -D warnings
-    
+
     cd ../streaming
     cargo +nightly clippy -- -D warnings
 
@@ -34,7 +34,10 @@ test:
     #!/usr/bin/env bash
     set -euxo pipefail
     clear
-    cargo test
+    # we need to test single threaded
+    # otherwise, we would have multiple tokio runtimes which would share the http client
+    # this will cause tests to fail -> does never happen in production
+    cargo test -- --test-threads 1
 
 
 # verifies the MSRV
