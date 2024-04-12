@@ -1,6 +1,6 @@
 [package]
 name = "s3-simple"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.70.0"
 authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
@@ -10,6 +10,9 @@ keywords = ["async", "aws", "client", "s3", "tokio"]
 description = "simple, fast and efficient s3 client for bucket operations "
 readme = "README.md"
 repository = "https://github.com/sebadob/s3-simple"
+
+[lib]
+doctest = false
 
 [dependencies]
 base64 = "0.22.0"
