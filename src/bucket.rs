@@ -1,3 +1,5 @@
+#![allow(clippy::assigning_clones)] // nightly throws some false positives
+
 use crate::command::{Command, CompleteMultipartUploadData, Part};
 use crate::constants::LONG_DATE_TIME;
 use crate::credentials::Credentials;
