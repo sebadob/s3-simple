@@ -149,23 +149,6 @@ impl Bucket {
             .await
     }
 
-    // pub async fn get_range_to_writer<T: AsyncWrite + Send + Unpin, S: AsRef<str>>(
-    //     &self,
-    //     path: S,
-    //     start: u64,
-    //     end: Option<u64>,
-    //     writer: &mut T,
-    // ) -> Result<S3StatusCode, S3Error> {
-    //     if let Some(end) = end {
-    //         assert!(start < end);
-    //     }
-    //
-    //     // let command = Command::GetObjectRange { start, end };
-    //     // let request = RequestImpl::new(self, path.as_ref(), command).await?;
-    //     // request.response_data_to_writer(writer).await
-    //     todo!()
-    // }
-
     /// DELETE an object
     pub async fn delete<S: AsRef<str>>(&self, path: S) -> Result<S3Response, S3Error> {
         self.send_request(Command::DeleteObject, path.as_ref())
@@ -425,42 +408,6 @@ impl Bucket {
         handle_writer.await?
     }
 
-    // fn tags_into_xml<S: AsRef<str>>(&self, tags: &[(S, S)]) -> String {
-    //     let mut s = String::new();
-    //     let content = tags
-    //         .iter()
-    //         .map(|(name, value)| {
-    //             format!(
-    //                 "<Tag><Key>{}</Key><Value>{}</Value></Tag>",
-    //                 name.as_ref(),
-    //                 value.as_ref()
-    //             )
-    //         })
-    //         .fold(String::new(), |mut a, b| {
-    //             a.push_str(b.as_str());
-    //             a
-    //         });
-    //     s.push_str("<Tagging><TagSet>");
-    //     s.push_str(&content);
-    //     s.push_str("</TagSet></Tagging>");
-    //     s
-    // }
-    //
-    // pub async fn put_tagging<S: AsRef<str>>(
-    //     &self,
-    //     path: &str,
-    //     tags: &[(S, S)],
-    // ) -> Result<S3Response, S3Error> {
-    //     let content = self.tags_into_xml(tags);
-    //     self.send_request(Command::PutObjectTagging { tags: &content }, path.as_ref())
-    //         .await
-    // }
-    //
-    // pub async fn delete_tagging<S: AsRef<str>>(&self, path: S) -> Result<S3Response, S3Error> {
-    //     self.send_request(Command::DeleteObjectTagging, path.as_ref())
-    //         .await
-    // }
-
     async fn list_page(
         &self,
         prefix: &str,
@@ -583,25 +530,6 @@ impl Bucket {
             ))
         }
     }
-
-    // TODO we could fully remove any writer / stream fn's. When we return the Response anyway,
-    // the user can freely decide to await it in memory or use streaming...
-    //
-    // async fn response_to_writer<T>(res: Response, writer: &mut T,) -> Result<S3StatusCode, S3Error>
-    // where
-    //     T: AsyncWrite + Send + Unpin
-    // {
-    //     let status_code = res.status();
-    //     if !status_code.is_success() {
-    //         // we can exit early in that case
-    //         return Err(S3Error::)
-    //     }
-    //
-    //     let mut stream = res.bytes_stream().into_stream();
-    //     while let Some(item) = stream.next().await {
-    //         writer.write_all(&item?).await?;
-    //     }
-    // }
 
     fn get_client<'a>() -> &'a reqwest::Client {
         CLIENT.get_or_init(|| {
