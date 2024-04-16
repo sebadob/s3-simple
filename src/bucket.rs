@@ -253,7 +253,6 @@ impl Bucket {
             .read_to_end(&mut first_chunk)
             .await?;
         debug!("first_chunk size: {}", first_chunk.len());
-        // TODO test how it behaves when the file size is exactly the chunk size
         if first_chunk_size < CHUNK_SIZE {
             debug!("first_chunk_size < CHUNK_SIZE -> doing normal PUT without stream");
             let res = self
@@ -397,7 +396,6 @@ impl Bucket {
             }
         }
 
-        // handle_reader.await?;
         handle_writer.await?
     }
 
@@ -798,7 +796,7 @@ mod tests {
 
         let bucket = Bucket::try_from_env().expect("env vars to be set in .env");
 
-        // we do not use rstest here since the tests seem to interfere with each other on the IO layer
+        // we do not use rstest here since the tests start multiple conflicting runtimes
         let file_sizes = vec![
             0,
             1,
