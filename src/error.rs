@@ -30,6 +30,8 @@ pub enum S3Error {
     InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
     #[error("tokio task join: {0}")]
     Join(#[from] tokio::task::JoinError),
+    #[error("invalid range: {0}")]
+    Range(&'static str),
     #[error("request: {0}")]
     Reqwest(#[from] reqwest::Error),
     #[error("serde xml: {0}")]

@@ -1,5 +1,3 @@
-#![allow(clippy::assigning_clones)] // nightly throws some false positives
-
 use crate::command::{Command, CompleteMultipartUploadData, Part};
 use crate::constants::LONG_DATE_TIME;
 use crate::credentials::Credentials;
@@ -125,15 +123,7 @@ impl Bucket {
         let res = self
             .send_request(Command::HeadObject, path.as_ref())
             .await?;
-        if res.status().is_success() {
-            Ok(HeadObjectResult::from(res.headers()))
-        } else {
-            eprintln!("{:?}", res.headers());
-            Err(S3Error::HttpFailWithBody(
-                res.status().as_u16(),
-                res.text().await?,
-            ))
-        }
+        Ok(HeadObjectResult::from(res.headers()))
     }
 
     /// GET an object
@@ -151,12 +141,30 @@ impl Bucket {
         end: Option<u64>,
     ) -> Result<S3Response, S3Error> {
         if let Some(end) = end {
-            // TODO remove assertion and add a new error type ?
-            assert!(start < end);
+            if start >= end {
+                return Err(S3Error::Range("start must be < than end"));
+            }
         }
         self.send_request(Command::GetObjectRange { start, end }, path.as_ref())
             .await
     }
+
+    // pub async fn get_range_to_writer<T: AsyncWrite + Send + Unpin, S: AsRef<str>>(
+    //     &self,
+    //     path: S,
+    //     start: u64,
+    //     end: Option<u64>,
+    //     writer: &mut T,
+    // ) -> Result<S3StatusCode, S3Error> {
+    //     if let Some(end) = end {
+    //         assert!(start < end);
+    //     }
+    //
+    //     // let command = Command::GetObjectRange { start, end };
+    //     // let request = RequestImpl::new(self, path.as_ref(), command).await?;
+    //     // request.response_data_to_writer(writer).await
+    //     todo!()
+    // }
 
     /// DELETE an object
     pub async fn delete<S: AsRef<str>>(&self, path: S) -> Result<S3Response, S3Error> {
@@ -209,15 +217,7 @@ impl Bucket {
         let res = self
             .send_request(Command::InitiateMultipartUpload { content_type }, path)
             .await?;
-
-        if res.status().is_success() {
-            Ok(quick_xml::de::from_str(&res.text().await?)?)
-        } else {
-            Err(S3Error::HttpFailWithBody(
-                res.status().as_u16(),
-                res.text().await?,
-            ))
-        }
+        Ok(quick_xml::de::from_str(&res.text().await?)?)
     }
 
     async fn multipart_request(
@@ -270,23 +270,19 @@ impl Bucket {
             .read_to_end(&mut first_chunk)
             .await?;
         debug!("first_chunk size: {}", first_chunk.len());
+        // TODO test how it behaves when the file size is exactly the chunk size
         if first_chunk_size < CHUNK_SIZE {
-            debug!("first_chunk_size < CHUNK_SIZE -> doing normal PUT without stream");
+            debug!("first_chunk_size < CHUNK_SIZE -> doing normal PUT wihout stream");
             let res = self
                 .put_with_content_type(&path, first_chunk.as_slice(), &content_type)
-                .await?;
+                .await;
 
-            let status_code = res.status().as_u16();
-            return if res.status().is_success() {
-                Ok(PutStreamResponse {
-                    status_code,
+            return match res {
+                Ok(res) => Ok(PutStreamResponse {
+                    status_code: res.status().as_u16(),
                     uploaded_bytes: first_chunk_size,
-                })
-            } else {
-                Err(S3Error::HttpFailWithBody(
-                    status_code,
-                    res.text().await.unwrap_or_default(),
-                ))
+                }),
+                Err(err) => Err(err),
             };
         }
 
@@ -322,6 +318,8 @@ impl Bucket {
                     mem::swap(&mut first_chunk, &mut bytes);
                     bytes
                 } else {
+                    // TODO how does this behave, when chunk size and file size line up exactly?
+                    // -> most probably error out -> catch it manually
                     match rx.recv_async().await {
                         Ok(Some(chunk)) => chunk,
                         Ok(None) => {
@@ -330,10 +328,13 @@ impl Bucket {
                         }
                         Err(err) => {
                             debug!("chunk reader channel has been closed: {}", err);
+                            // In this case, the reader has been closed. We either had an error
+                            // (how to catch this?) or all bytes have been read.
                             break;
                         }
                     }
                 };
+                debug!("chunk size in loop {}: {}", part_number + 1, chunk.len());
 
                 total_size += chunk.len();
 
@@ -341,30 +342,24 @@ impl Bucket {
                 part_number += 1;
                 let res = slf
                     .multipart_request(&path, chunk, part_number, upload_id, &content_type)
-                    .await?;
+                    .await;
 
-                if !res.status().is_success() {
-                    // if chunk upload failed - abort the upload
-                    match slf.abort_upload(&path, upload_id).await {
-                        Ok(_) => {
-                            return Err(S3Error::HttpFailWithBody(
-                                res.status().as_u16(),
-                                res.text().await?,
-                            ));
-                        }
-                        Err(error) => {
-                            return Err(error);
-                        }
+                match res {
+                    Ok(res) => {
+                        let etag = res
+                            .headers()
+                            .get("etag")
+                            .expect("ETag in multipart response headers")
+                            .to_str()
+                            .expect("ETag to convert to str successfully");
+                        etags.push(etag.to_string());
+                    }
+                    Err(err) => {
+                        // if chunk upload failed - abort the upload
+                        slf.abort_upload(&path, upload_id).await?;
+                        return Err(err);
                     }
                 }
-
-                let etag = res
-                    .headers()
-                    .get("etag")
-                    .expect("ETag in multipart response headers")
-                    .to_str()
-                    .expect("ETag to convert to str successfully");
-                etags.push(etag.to_string());
             }
             debug!(
                 "multipart uploading finished after {} parts with total size of {} bytes",
@@ -383,18 +378,14 @@ impl Bucket {
             debug!("data for multipart finishing: {:?}", inner_data);
             let res = slf
                 .complete_multipart_upload(&path, &msg.upload_id, inner_data)
-                .await?;
+                .await;
 
-            if res.status().is_success() {
-                Ok(PutStreamResponse {
+            match res {
+                Ok(res) => Ok(PutStreamResponse {
                     status_code: res.status().as_u16(),
                     uploaded_bytes: total_size,
-                })
-            } else {
-                Err(S3Error::HttpFailWithBody(
-                    res.status().as_u16(),
-                    res.text().await?,
-                ))
+                }),
+                Err(err) => Err(err),
             }
         });
 
@@ -421,14 +412,54 @@ impl Bucket {
                     }
                 }
                 Err(err) => {
+                    // TODO make sure we don't get here when the chunks meet the
+                    // file size exactly, because in this case a simple < check will not work
+                    // for identifying the last element.
                     error!("stream reader error: {}", err);
                     break;
                 }
             }
         }
 
+        // handle_reader.await?;
         handle_writer.await?
     }
+
+    // fn tags_into_xml<S: AsRef<str>>(&self, tags: &[(S, S)]) -> String {
+    //     let mut s = String::new();
+    //     let content = tags
+    //         .iter()
+    //         .map(|(name, value)| {
+    //             format!(
+    //                 "<Tag><Key>{}</Key><Value>{}</Value></Tag>",
+    //                 name.as_ref(),
+    //                 value.as_ref()
+    //             )
+    //         })
+    //         .fold(String::new(), |mut a, b| {
+    //             a.push_str(b.as_str());
+    //             a
+    //         });
+    //     s.push_str("<Tagging><TagSet>");
+    //     s.push_str(&content);
+    //     s.push_str("</TagSet></Tagging>");
+    //     s
+    // }
+    //
+    // pub async fn put_tagging<S: AsRef<str>>(
+    //     &self,
+    //     path: &str,
+    //     tags: &[(S, S)],
+    // ) -> Result<S3Response, S3Error> {
+    //     let content = self.tags_into_xml(tags);
+    //     self.send_request(Command::PutObjectTagging { tags: &content }, path.as_ref())
+    //         .await
+    // }
+    //
+    // pub async fn delete_tagging<S: AsRef<str>>(&self, path: S) -> Result<S3Response, S3Error> {
+    //     self.send_request(Command::DeleteObjectTagging, path.as_ref())
+    //         .await
+    // }
 
     async fn list_page(
         &self,
@@ -437,7 +468,7 @@ impl Bucket {
         continuation_token: Option<String>,
         start_after: Option<String>,
         max_keys: Option<usize>,
-    ) -> Result<(ListBucketResult, u16), S3Error> {
+    ) -> Result<ListBucketResult, S3Error> {
         let command = if self.list_objects_v2 {
             Command::ListObjectsV2 {
                 prefix,
@@ -459,10 +490,9 @@ impl Bucket {
         };
 
         let resp = self.send_request(command, "/").await?;
-        let status_code = resp.status().as_u16();
-        let list_bucket_result = quick_xml::de::from_reader(resp.bytes().await?.as_ref())?;
-
-        Ok((list_bucket_result, status_code))
+        let bytes = resp.bytes().await?;
+        let list_bucket_result = quick_xml::de::from_reader(bytes.as_ref())?;
+        Ok(list_bucket_result)
     }
 
     /// List bucket contents
@@ -475,7 +505,7 @@ impl Bucket {
         let mut continuation_token = None;
 
         loop {
-            let (list_bucket_result, _) = self
+            let list_bucket_result = self
                 .list_page(prefix, delimiter, continuation_token, None, None)
                 .await?;
             continuation_token = list_bucket_result.next_continuation_token.clone();
@@ -544,8 +574,34 @@ impl Bucket {
         .send()
         .await?;
 
-        Ok(res)
+        if res.status().is_success() {
+            Ok(res)
+        } else {
+            Err(S3Error::HttpFailWithBody(
+                res.status().as_u16(),
+                res.text().await?,
+            ))
+        }
     }
+
+    // TODO we could fully remove any writer / stream fn's. When we return the Response anyway,
+    // the user can freely decide to await it in memory or use streaming...
+    //
+    // async fn response_to_writer<T>(res: Response, writer: &mut T,) -> Result<S3StatusCode, S3Error>
+    // where
+    //     T: AsyncWrite + Send + Unpin
+    // {
+    //     let status_code = res.status();
+    //     if !status_code.is_success() {
+    //         // we can exit early in that case
+    //         return Err(S3Error::)
+    //     }
+    //
+    //     let mut stream = res.bytes_stream().into_stream();
+    //     while let Some(item) = stream.next().await {
+    //         writer.write_all(&item?).await?;
+    //     }
+    // }
 
     fn get_client<'a>() -> &'a reqwest::Client {
         CLIENT.get_or_init(|| {
@@ -821,6 +877,7 @@ mod tests {
 
         let bucket = Bucket::try_from_env().expect("env vars to be set in .env");
 
+        // we do not use rstest here since the tests seem to interfere with each other on the IO layer
         let file_sizes = vec![
             0,
             1,
