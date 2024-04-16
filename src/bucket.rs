@@ -255,7 +255,7 @@ impl Bucket {
         debug!("first_chunk size: {}", first_chunk.len());
         // TODO test how it behaves when the file size is exactly the chunk size
         if first_chunk_size < CHUNK_SIZE {
-            debug!("first_chunk_size < CHUNK_SIZE -> doing normal PUT wihout stream");
+            debug!("first_chunk_size < CHUNK_SIZE -> doing normal PUT without stream");
             let res = self
                 .put_with_content_type(&path, first_chunk.as_slice(), &content_type)
                 .await;
@@ -301,8 +301,6 @@ impl Bucket {
                     mem::swap(&mut first_chunk, &mut bytes);
                     bytes
                 } else {
-                    // TODO how does this behave, when chunk size and file size line up exactly?
-                    // -> most probably error out -> catch it manually
                     match rx.recv_async().await {
                         Ok(Some(chunk)) => chunk,
                         Ok(None) => {
@@ -311,8 +309,6 @@ impl Bucket {
                         }
                         Err(err) => {
                             debug!("chunk reader channel has been closed: {}", err);
-                            // In this case, the reader has been closed. We either had an error
-                            // (how to catch this?) or all bytes have been read.
                             break;
                         }
                     }
@@ -395,9 +391,6 @@ impl Bucket {
                     }
                 }
                 Err(err) => {
-                    // TODO make sure we don't get here when the chunks meet the
-                    // file size exactly, because in this case a simple < check will not work
-                    // for identifying the last element.
                     error!("stream reader error: {}", err);
                     break;
                 }
