@@ -49,7 +49,7 @@ they are often running on not that powerful big servers.
 Take a look at the [examples](https://github.com/sebadob/s3-simple/tree/main/examples), but basically:
 
 ```rust
-let bucket = Bucket::try_from_env().expect("env vars to be set");
+let bucket = Bucket::try_from_env() ?;
 
 // upload
 bucket.put("test.txt", b"Hello S3").await?;
