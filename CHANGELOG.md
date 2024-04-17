@@ -15,7 +15,7 @@ This makes it possible to go from:
 ### old
 
 ```rust
-let bucket = Bucket::try_from_env() ?;
+let bucket = Bucket::try_from_env()?;
 
 // upload
 let res = bucket.put("test.txt", b"Hello S3").await?;
@@ -31,7 +31,7 @@ assert_eq!(body.as_ref(), b"Hello S3");
 ### new
 
 ```rust
-let bucket = Bucket::try_from_env() ?;
+let bucket = Bucket::try_from_env()?;
 
 // upload
 bucket.put("test.txt", b"Hello S3").await?;
