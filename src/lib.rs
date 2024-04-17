@@ -7,9 +7,15 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use std::env;
 
-pub use crate::bucket::{Bucket, BucketOptions};
+/// S3 Bucket operations, your main entrypoint
+pub use crate::bucket::{Bucket};
+/// Custom options for bucket connections
+pub use crate::bucket::{BucketOptions};
+/// S3 Credentials
 pub use crate::credentials::{AccessKeyId, AccessKeySecret, Credentials};
+/// Specialized S3 Error type which wraps errors from different sources
 pub use crate::error::S3Error;
+/// Specialized Response objects
 pub use crate::types::{HeadObjectResult, Object, PutStreamResponse};
 pub use reqwest::Response as S3Response;
 pub use reqwest::StatusCode as S3StatusCode;
@@ -22,6 +28,7 @@ mod error;
 mod signature;
 mod types;
 
+/// S3 Region Wrapper
 #[derive(Debug, Clone)]
 pub struct Region(String);
 
