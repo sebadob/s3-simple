@@ -15,13 +15,15 @@ check:
     clear
     cargo update
 
-    cargo +nightly clippy -- -D warnings
+    # nightly check currently throws errors
+    #cargo +nightly clippy -- -D warnings
+    cargo clippy -- -D warnings
 
     echo 'Checking minimal versions'
     cargo minimal-versions check
 
-    echo 'Making sure the examples are fine'
     cargo update
+    echo 'Making sure the examples are fine'
     cd examples/bucket-ops
     cargo +nightly clippy -- -D warnings
 

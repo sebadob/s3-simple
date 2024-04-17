@@ -42,22 +42,22 @@ they are often running on not that powerful big servers.
     - list bucket contents
     - S3 internal copy of objects
 - all operations are tested against [Minio](https://github.com/minio/minio)
-  and [Garage](https://git.deuxfleurs.fr/Deuxfleurs/garage) 
+  and [Garage](https://git.deuxfleurs.fr/Deuxfleurs/garage)
 
 ## How to use it
 
 Take a look at the [examples](https://github.com/sebadob/s3-simple/tree/main/examples), but basically:
 
 ```rust
-let bucket = Bucket::try_from_env().expect("env vars to be set");
+let bucket = Bucket::try_from_env() ?;
 
 // upload
-let res = bucket.put("test.txt", b"Hello S3").await?;
-assert!(res.status().is_success());
+bucket.put("test.txt", b"Hello S3").await?;
 
 // get it back
 let res = bucket.get("test.txt").await?;
-assert!(res.status().is_success());
+// no manual status code checking necessary,
+// any non-success will return an S3Error
 let body = res.bytes().await?;
 assert_eq!(body.as_ref(), b"Hello S3");
 ```

@@ -52,7 +52,6 @@ async fn main() -> Result<(), S3Error> {
     let res = bucket
         .put_stream(&mut reader_file, file_name.to_string())
         .await?;
-    assert!(res.status_code < 300);
     assert_eq!(res.uploaded_bytes, file_size);
 
     // streaming download
@@ -62,7 +61,6 @@ async fn main() -> Result<(), S3Error> {
     // You can decide, if you want to buffer the body in memory or
     // convert it into a stream.
     let res = bucket.get(&file_name).await?;
-    assert!(res.status().is_success());
     let stream = res.bytes_stream();
     tokio::pin!(stream);
     while let Some(Ok(item)) = stream.next().await {
