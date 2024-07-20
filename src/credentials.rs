@@ -5,7 +5,7 @@ use std::env;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Debug, Clone)]
-pub struct AccessKeyId(String);
+pub struct AccessKeyId(pub String);
 
 impl AsRef<str> for AccessKeyId {
     fn as_ref(&self) -> &str {
@@ -20,7 +20,7 @@ impl AccessKeyId {
 }
 
 #[derive(Clone)]
-pub struct AccessKeySecret(String);
+pub struct AccessKeySecret(pub String);
 
 impl Debug for AccessKeySecret {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -47,6 +47,16 @@ pub struct Credentials {
 }
 
 impl Credentials {
+    pub fn new<S>(key: S, secret: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            access_key_id: AccessKeyId(key.into()),
+            access_key_secret: AccessKeySecret(secret.into()),
+        }
+    }
+
     pub fn try_from_env() -> Result<Self, S3Error> {
         let access_key_id = env::var("S3_ACCESS_KEY_ID")?;
         let access_key_secret = env::var("S3_ACCESS_KEY_SECRET")?;

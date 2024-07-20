@@ -30,9 +30,16 @@ mod types;
 
 /// S3 Region Wrapper
 #[derive(Debug, Clone)]
-pub struct Region(String);
+pub struct Region(pub String);
 
 impl Region {
+    pub fn new<S>(region: S) -> Self
+    where
+        S: Into<String>,
+    {
+       Self(region.into())
+    }
+
     pub fn try_from_env() -> Result<Self, S3Error> {
         Ok(Self(env::var("S3_REGION")?))
     }
