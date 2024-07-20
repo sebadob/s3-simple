@@ -56,6 +56,7 @@ pub struct Bucket {
 }
 
 #[allow(dead_code)]
+#[allow(clippy::assigning_clones)] // false-positive warnings
 impl Bucket {
     fn host_domain(&self) -> String {
         match self.host.domain() {
