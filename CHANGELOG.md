@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.0
+
+- make internal values for `AccessKeyId`, `AccessKeySecret` and `Region` `pub` for a better DX
+  when used without env vars
+- added a `new()` fn for `Credentials`
+- clippy lints from latest Rust version have been applied
+- external deps have been updated
+
 ## v0.3.0
 
 Any request status returned from any action will be checked early from this version on.  

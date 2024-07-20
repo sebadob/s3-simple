@@ -1,6 +1,6 @@
 [package]
 name = "s3-simple"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.70.0"
 authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
@@ -26,7 +26,7 @@ hmac = "0.12.1"
 http = "1.1.0"
 md5 = "0.7.0"
 percent-encoding = "2.3.1"
-quick-xml = { version = "0.31.0", features = ["serialize"] }
+quick-xml = { version = "0.36.0", features = ["serialize"] }
 reqwest = { version = "0.12.3", default-features = false, features = [
     "brotli", "rustls-tls", "rustls-tls-webpki-roots", "stream"
 ] }
@@ -40,7 +40,7 @@ url = "2.5.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
-rstest = "0.19.0"
+rstest = "0.21.0"
 tokio-test = "0.4.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "tracing"] }
 tracing-test = "0.2.4"
