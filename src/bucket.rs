@@ -253,6 +253,7 @@ impl Bucket {
             .take(CHUNK_SIZE as u64)
             .read_to_end(&mut first_chunk)
             .await?;
+
         debug!("first_chunk size: {}", first_chunk.len());
         if first_chunk_size < CHUNK_SIZE {
             debug!("first_chunk_size < CHUNK_SIZE -> doing normal PUT without stream");
@@ -457,7 +458,7 @@ impl Bucket {
         Ok(results)
     }
 
-    /// S3 internal copy an object from one place to another
+    /// S3 internal copy an object from one place to another inside the same bucket
     pub async fn copy_internal<F, T>(&self, from: F, to: T) -> Result<S3StatusCode, S3Error>
     where
         F: AsRef<str>,
@@ -467,6 +468,24 @@ impl Bucket {
             let from = from.as_ref();
             let from = from.strip_prefix('/').unwrap_or(from);
             format!("{}/{}", self.name, from)
+        };
+        Ok(self
+            .send_request(Command::CopyObject { from: &fq_from }, to.as_ref())
+            .await?
+            .status())
+    }
+
+    /// S3 internal copy an object from another bucket into "this" bucket
+    pub async fn copy_internal_from<B, F, T>(&self, from_bucket: B, from_object: F, to: T) -> Result<S3StatusCode, S3Error>
+    where
+        B: AsRef<str>,
+        F: AsRef<str>,
+        T: AsRef<str>,
+    {
+        let fq_from = {
+            let from_object = from_object.as_ref();
+            let from_object = from_object.strip_prefix('/').unwrap_or(from_object);
+            format!("{}/{}", from_bucket.as_ref(), from_object)
         };
         Ok(self
             .send_request(Command::CopyObject { from: &fq_from }, to.as_ref())
