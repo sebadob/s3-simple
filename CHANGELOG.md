@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.1
+
+There is the new `copy_internal_from()` for a `Bucket`, which allows you to do an internal copy on the S3 storage from
+a different bucket (your key has access to) into the configured one. The already existing `copy_internal()` only allowed
+copies inside the same bucket.
+
 ## v0.4.0
 
 - make internal values for `AccessKeyId`, `AccessKeySecret` and `Region` `pub` for a better DX
