@@ -49,7 +49,7 @@ msrv-verify:
 
 # find's the new MSRV, if it needs a bump
 msrv-find:
-    cargo msrv --min 1.70.0
+    cargo msrv find --min $(cat Cargo.toml | grep '^rust-version =' | cut -d " " -f3 | xargs)
 
 
 # verify thats everything is good
