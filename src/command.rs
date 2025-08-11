@@ -39,12 +39,12 @@ impl fmt::Display for CompleteMultipartUploadData {
 
 impl CompleteMultipartUploadData {
     pub fn len(&self) -> usize {
-        self.to_string().as_bytes().len()
+        self.to_string().len()
     }
 
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
-        self.to_string().as_bytes().is_empty()
+        self.to_string().is_empty()
     }
 }
 
