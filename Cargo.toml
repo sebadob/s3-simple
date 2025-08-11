@@ -1,8 +1,8 @@
 [package]
 name = "s3-simple"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.82.0"
 authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
 license = "Apache-2.0"
 categories = ["api-bindings"]
@@ -17,22 +17,21 @@ doctest = false
 [dependencies]
 base64 = "0.22.0"
 bytes = "1.6.0"
-chrono = { version = "0.4" }
 dotenvy = "0.15"
 flume = "0.11.0"
 futures-util = "0.3.30"
 hex = "0.4.3"
 hmac = "0.12.1"
 http = "1.1.0"
-md5 = "0.7.0"
+md5 = "0.8.0"
 percent-encoding = "2.3.1"
-quick-xml = { version = "0.37.0", features = ["serialize"] }
+quick-xml = { version = "0.38.1", features = ["serialize"] }
 reqwest = { version = "0.12.3", default-features = false, features = [
     "brotli", "rustls-tls", "rustls-tls-webpki-roots", "stream"
 ] }
 serde = { version = "1.0.197", features = ["derive"] }
 sha2 = "0.10.8"
-thiserror = "1.0.38"
+thiserror = "2"
 time = { version = "0.3.35", features = ["formatting", "macros"] }
 tokio = { version = "1.37.0", features = ["fs", "macros", "time"] }
 tracing = { version = "0.1.37", features = ["attributes"] }
@@ -40,7 +39,4 @@ url = "2.5.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
-rstest = "0.23.0"
-tokio-test = "0.4.4"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "tracing"] }
 tracing-test = "0.2.4"
