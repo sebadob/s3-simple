@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.0
+
+This version only bumps some dependency versions and applies `clippy` lints from Rust 1.89. With the dependency bumps,
+the MSRV was bumped to `1.82.0` as well.
+
 ## v0.4.1
 
 There is the new `copy_internal_from()` for a `Bucket`, which allows you to do an internal copy on the S3 storage from
