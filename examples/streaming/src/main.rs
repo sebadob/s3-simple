@@ -64,7 +64,7 @@ async fn main() -> Result<(), S3Error> {
     let stream = res.bytes_stream();
     tokio::pin!(stream);
     while let Some(Ok(item)) = stream.next().await {
-        let _ = file.write(item.as_ref()).await?;
+        file.write_all(item.as_ref()).await?;
     }
     // flush / sync all possibly left over data
     file.sync_all().await?;
