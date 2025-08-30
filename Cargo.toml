@@ -14,6 +14,19 @@ repository = "https://github.com/sebadob/s3-simple"
 [lib]
 doctest = false
 
+[features]
+default = ["rustls-tls-webpki-roots"]
+
+rustls-tls = ["reqwest/rustls-tls"]
+rustls-tls-no-provider = ["reqwest/rustls-tls-no-provider"]
+rustls-tls-manual-roots = ["reqwest/rustls-tls-manual-roots"]
+rustls-tls-webpki-roots = ["reqwest/rustls-tls-webpki-roots"]
+rustls-tls-native-roots = ["reqwest/rustls-tls-native-roots"]
+
+native-tls = ["reqwest/native-tls"]
+native-tls-alpn = ["reqwest/native-tls-alpn"]
+native-tls-vendored = ["reqwest/native-tls-vendored"]
+
 [dependencies]
 base64 = "0.22.0"
 bytes = "1.6.0"
@@ -27,7 +40,8 @@ md5 = "0.8.0"
 percent-encoding = "2.3.1"
 quick-xml = { version = "0.38.1", features = ["serialize"] }
 reqwest = { version = "0.12.3", default-features = false, features = [
-    "brotli", "rustls-tls", "rustls-tls-webpki-roots", "stream"
+    "brotli",
+    "stream",
 ] }
 serde = { version = "1.0.197", features = ["derive"] }
 sha2 = "0.10.8"
