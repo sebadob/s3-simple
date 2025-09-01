@@ -1,5 +1,6 @@
 use crate::constants::EMPTY_PAYLOAD_SHA;
 use crate::types::Multipart;
+use http::HeaderMap;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -54,6 +55,7 @@ pub(crate) enum Command<'a> {
     HeadObject,
     CopyObject {
         from: &'a str,
+        headers: HeaderMap,
     },
     DeleteObject,
     DeleteObjectTagging,
@@ -65,7 +67,7 @@ pub(crate) enum Command<'a> {
     GetObjectTagging,
     PutObject {
         content: &'a [u8],
-        content_type: &'a str,
+        headers: HeaderMap,
         multipart: Option<Multipart<'a>>,
     },
     PutObjectTagging {
@@ -107,7 +109,7 @@ pub(crate) enum Command<'a> {
     //     expiry_secs: u32,
     // },
     InitiateMultipartUpload {
-        content_type: &'a str,
+        headers: HeaderMap,
     },
     UploadPart {
         part_number: u32,
@@ -134,7 +136,7 @@ impl<'a> Command<'a> {
             | Command::GetObjectTagging
             | Command::ListMultipartUploads { .. } => http::Method::GET,
             Command::PutObject { .. }
-            | Command::CopyObject { from: _ }
+            | Command::CopyObject { .. }
             | Command::PutObjectTagging { .. }
             | Command::UploadPart { .. } => http::Method::PUT,
             Command::DeleteObject
@@ -154,15 +156,6 @@ impl<'a> Command<'a> {
             Command::UploadPart { content, .. } => content.len(),
             Command::CompleteMultipartUpload { data, .. } => data.len(),
             _ => 0,
-        }
-    }
-
-    pub(crate) fn content_type(&self) -> &str {
-        match self {
-            Command::InitiateMultipartUpload { content_type } => content_type,
-            Command::PutObject { content_type, .. } => content_type,
-            Command::CompleteMultipartUpload { .. } => "application/xml",
-            _ => "text/plain",
         }
     }
 

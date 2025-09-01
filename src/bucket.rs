@@ -169,10 +169,50 @@ impl Bucket {
         content: &[u8],
         content_type: &str,
     ) -> Result<S3Response, S3Error> {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_str(content_type)?);
+
         self.send_request(
             Command::PutObject {
                 content,
-                content_type,
+                headers,
+                multipart: None,
+            },
+            path.as_ref(),
+        )
+        .await
+    }
+
+    /// PUT an object with specific headers.
+    ///
+    /// `headers` accepts additional headers to include in the request. Required headers for the
+    /// request (i.e. `Authorization`, `Content-Length`) don't need to be included, as they are
+    /// still handled automatically.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let bucket = Bucket::try_from_env().await?;
+    /// let mut headers = HeaderMap::new();
+    /// let content = b"world";
+    ///
+    /// // Denote that this a text file.
+    /// headers.insert("Content-Type", "text/plain");
+    /// // Tell S3 what the caching behavior this object should respond to clients with.
+    /// headers.insert("Cache-Control", "public, max-age=3600");
+    ///
+    /// bucket.put_with("hello.txt", content, headers).await?;
+    /// ```
+    pub async fn put_with<S: AsRef<str>>(
+        &self,
+        path: S,
+        content: &[u8],
+        extra_headers: HeaderMap,
+    ) -> Result<S3Response, S3Error> {
+        self.send_request(
+            Command::PutObject {
+                content,
+                headers: extra_headers,
                 multipart: None,
             },
             path.as_ref(),
@@ -196,10 +236,15 @@ impl Bucket {
     async fn initiate_multipart_upload(
         &self,
         path: &str,
-        content_type: &str,
+        extra_headers: HeaderMap,
     ) -> Result<InitiateMultipartUploadResponse, S3Error> {
         let res = self
-            .send_request(Command::InitiateMultipartUpload { content_type }, path)
+            .send_request(
+                Command::InitiateMultipartUpload {
+                    headers: extra_headers,
+                },
+                path,
+            )
             .await?;
         Ok(quick_xml::de::from_str(&res.text().await?)?)
     }
@@ -210,14 +255,13 @@ impl Bucket {
         chunk: Vec<u8>,
         part_number: u32,
         upload_id: &str,
-        content_type: &str,
     ) -> Result<Response, S3Error> {
         self.send_request(
             Command::PutObject {
                 // TODO switch to owned data would make sense here probably
                 content: &chunk,
                 multipart: Some(Multipart::new(part_number, upload_id)),
-                content_type,
+                headers: HeaderMap::new(),
             },
             path,
         )
@@ -246,6 +290,29 @@ impl Bucket {
     where
         R: AsyncRead + Unpin,
     {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_str(&content_type)?);
+
+        self.put_stream_with(reader, path, headers).await
+    }
+
+    /// Streaming object upload from any reader that implements [`AsyncRead`].
+    ///
+    /// `headers` accepts additional headers to include in the request. Required headers for the
+    /// request (i.e. `Authorization`, `Content-Length`) don't need to be included, as they are
+    /// still handled automatically.
+    #[tracing::instrument(level = "debug", skip_all, fields(path = path))]
+    pub async fn put_stream_with<R>(
+        &self,
+        reader: &mut R,
+        path: String,
+        extra_headers: HeaderMap,
+    ) -> Result<PutStreamResponse, S3Error>
+    where
+        R: AsyncRead + Unpin,
+    {
+        // Grab the content type.
+
         // If the file is smaller CHUNK_SIZE, just do a regular upload,
         // Otherwise, perform a multipart upload.
         let mut first_chunk = Vec::with_capacity(CHUNK_SIZE);
@@ -258,7 +325,7 @@ impl Bucket {
         if first_chunk_size < CHUNK_SIZE {
             debug!("first_chunk_size < CHUNK_SIZE -> doing normal PUT without stream");
             let res = self
-                .put_with_content_type(&path, first_chunk.as_slice(), &content_type)
+                .put_with(&path, first_chunk.as_slice(), extra_headers)
                 .await;
 
             return match res {
@@ -286,7 +353,7 @@ impl Bucket {
         let handle_writer = tokio::spawn(async move {
             debug!("writer task has been started");
 
-            let msg = slf.initiate_multipart_upload(&path, &content_type).await?;
+            let msg = slf.initiate_multipart_upload(&path, extra_headers).await?;
             debug!("{:?}", msg);
             let path = msg.key;
             let upload_id = &msg.upload_id;
@@ -321,7 +388,7 @@ impl Bucket {
                 // chunk upload
                 part_number += 1;
                 let res = slf
-                    .multipart_request(&path, chunk, part_number, upload_id, &content_type)
+                    .multipart_request(&path, chunk, part_number, upload_id)
                     .await;
 
                 match res {
@@ -464,19 +531,64 @@ impl Bucket {
         F: AsRef<str>,
         T: AsRef<str>,
     {
+        self.copy_internal_with(from, to, HeaderMap::new()).await
+    }
+
+    /// S3 internal copy an object from one place to another inside the same bucket.
+    ///
+    /// `headers` accepts additional headers to include in the request. Required headers for the
+    /// request (i.e. `Authorization`, `Content-Length`) don't need to be included, as they are
+    /// still handled automatically.
+    ///
+    /// # Examples
+    ///
+    /// This example shows how to modify the metadata of an existing object in S3.
+    ///
+    /// ```no_run
+    /// let bucket = Bucket::try_from_env().await?;
+    /// let mut headers = HeaderMap::new();
+    ///
+    /// // `x-amz-metadata-directive` tells S3 what to do with the existing object metadata.
+    /// headers.insert("x-amz-metadata-directive", "REPLACE");
+    /// headers.insert("Content-Type", "image/jpeg");
+    /// headers.insert("Cache-Control", "public, max-age=86400");
+    ///
+    /// bucket.copy_internal_with("cat.jpg", "cat.jpg", headers).await?;
+    /// ```
+    pub async fn copy_internal_with<F, T>(
+        &self,
+        from: F,
+        to: T,
+        extra_headers: HeaderMap,
+    ) -> Result<S3StatusCode, S3Error>
+    where
+        F: AsRef<str>,
+        T: AsRef<str>,
+    {
         let fq_from = {
             let from = from.as_ref();
             let from = from.strip_prefix('/').unwrap_or(from);
             format!("{}/{}", self.name, from)
         };
         Ok(self
-            .send_request(Command::CopyObject { from: &fq_from }, to.as_ref())
+            .send_request(
+                Command::CopyObject {
+                    from: &fq_from,
+                    headers: extra_headers,
+                },
+                to.as_ref(),
+            )
             .await?
             .status())
     }
 
     /// S3 internal copy an object from another bucket into "this" bucket
-    pub async fn copy_internal_from<B, F, T>(&self, from_bucket: B, from_object: F, to: T) -> Result<S3StatusCode, S3Error>
+    pub async fn copy_internal_from<B, F, T>(
+        &self,
+        from_bucket: B,
+        from_object: F,
+        to: T,
+    ) -> Result<S3StatusCode, S3Error>
     where
         B: AsRef<str>,
         F: AsRef<str>,
@@ -488,7 +600,13 @@ impl Bucket {
             format!("{}/{}", from_bucket.as_ref(), from_object)
         };
         Ok(self
-            .send_request(Command::CopyObject { from: &fq_from }, to.as_ref())
+            .send_request(
+                Command::CopyObject {
+                    from: &fq_from,
+                    headers: HeaderMap::new(),
+                },
+                to.as_ref(),
+            )
             .await?
             .status())
     }
@@ -509,11 +627,11 @@ impl Bucket {
 
     async fn send_request(
         &self,
-        command: Command<'_>,
+        mut command: Command<'_>,
         path: &str,
     ) -> Result<reqwest::Response, S3Error> {
         let url = self.build_url(&command, path)?;
-        let headers = self.build_headers(&command, &url).await?;
+        let headers = self.build_headers(&mut command, &url).await?;
 
         let builder = Self::get_client()
             .request(command.http_method(), url)
@@ -557,11 +675,25 @@ impl Bucket {
         })
     }
 
-    async fn build_headers(&self, command: &Command<'_>, url: &Url) -> Result<HeaderMap, S3Error> {
+    /// Builds headers for the request.
+    ///
+    /// `command` is `&mut` since this function will consume any `headers` that were passed in from
+    /// the client.
+    async fn build_headers(
+        &self,
+        command: &mut Command<'_>,
+        url: &Url,
+    ) -> Result<HeaderMap, S3Error> {
         let cmd_hash = command.sha256();
         let now = OffsetDateTime::now_utc();
 
-        let mut headers = HeaderMap::with_capacity(4);
+        // For commands that accept the `HeaderMap` as part of the command, re-use the map.
+        let mut headers = match command {
+            Command::PutObject { headers, .. }
+            | Command::InitiateMultipartUpload { headers, .. }
+            | Command::CopyObject { headers, .. } => std::mem::take(headers),
+            _ => HeaderMap::with_capacity(4),
+        };
 
         // host header
         let domain = self.host_domain();
@@ -576,7 +708,7 @@ impl Bucket {
 
         // add command specific header
         match command {
-            Command::CopyObject { from } => {
+            Command::CopyObject { from, .. } => {
                 headers.insert(
                     HeaderName::from_static("x-amz-copy-source"),
                     HeaderValue::from_str(from)?,
@@ -587,6 +719,30 @@ impl Bucket {
             Command::GetObject => {}
             Command::GetObjectTagging => {}
             Command::GetBucketLocation => {}
+
+            Command::InitiateMultipartUpload { .. } => {
+                if !headers.contains_key(CONTENT_TYPE) {
+                    headers.insert(
+                        CONTENT_TYPE,
+                        HeaderValue::from_str("application/octet-stream")?,
+                    );
+                }
+            }
+            Command::CompleteMultipartUpload { .. } => {
+                headers.insert(CONTENT_TYPE, HeaderValue::from_str("application/xml")?);
+            }
+            Command::PutObject { multipart, .. } => {
+                // If this is not a multipart upload, default to `application/octet-stream` in case
+                // the content type was never set.
+                //
+                // N.B.: For multipart uploads, the content type is set during initiation.
+                if multipart.is_none() && !headers.contains_key(CONTENT_TYPE) {
+                    headers.insert(
+                        CONTENT_TYPE,
+                        HeaderValue::from_str("application/octet-stream")?,
+                    );
+                }
+            }
 
             // Needed to make Garage work while Minio
             // seems to ignore `content-length: 0` for these
@@ -599,7 +755,7 @@ impl Bucket {
                     CONTENT_LENGTH,
                     HeaderValue::try_from(command.content_length().to_string())?,
                 );
-                headers.insert(CONTENT_TYPE, HeaderValue::from_str(command.content_type())?);
+                headers.insert(CONTENT_TYPE, HeaderValue::from_str("text/plain")?);
             }
         }
 
