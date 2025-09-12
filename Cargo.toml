@@ -1,6 +1,6 @@
 [package]
 name = "s3-simple"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 rust-version = "1.82.0"
 authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
@@ -15,7 +15,7 @@ repository = "https://github.com/sebadob/s3-simple"
 doctest = false
 
 [features]
-default = ["rustls-tls-webpki-roots"]
+default = ["rustls-tls", "rustls-tls-webpki-roots"]
 
 rustls-tls = ["reqwest/rustls-tls"]
 rustls-tls-no-provider = ["reqwest/rustls-tls-no-provider"]
