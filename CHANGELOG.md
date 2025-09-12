@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.0
+
+You can now change the TLS provider via features. The default is still `rustls` with embedded root certs to not create a
+breaking change, but you can disable default features and change it to `native-tls`, if you like.
+
+In addition, some client functions have a `*_with` function, which lets you add additional custom headers to requests.
+
 ## v0.5.0
 
 This version only bumps some dependency versions and applies `clippy` lints from Rust 1.89. With the dependency bumps,
