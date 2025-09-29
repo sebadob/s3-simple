@@ -20,7 +20,7 @@ use std::{env, mem};
 use time::format_description::well_known::Rfc2822;
 use time::OffsetDateTime;
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 use url::Url;
 
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -451,7 +451,7 @@ impl Bucket {
 
                     debug!("stream reader read {} bytes", size);
                     if let Err(err) = tx.send_async(Some(buf)).await {
-                        error!(
+                        warn!(
                             "Stream Writer has been closed before reader finished: {}",
                             err
                         );
