@@ -42,4 +42,6 @@ pub enum S3Error {
     UrlParse(#[from] url::ParseError),
     #[error("Utf8 decoding error: {0}")]
     Utf8(#[from] std::str::Utf8Error),
+    #[error("Unexpected response: {0}")]
+    UnexpectedResponse(&'static str),
 }

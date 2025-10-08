@@ -396,9 +396,13 @@ impl Bucket {
                         let etag = res
                             .headers()
                             .get("etag")
-                            .expect("ETag in multipart response headers")
+                            .ok_or_else(|| {
+                                S3Error::UnexpectedResponse(
+                                    "missing ETag in multipart response headers",
+                                )
+                            })?
                             .to_str()
-                            .expect("ETag to convert to str successfully");
+                            .map_err(S3Error::HeaderToStr)?;
                         etags.push(etag.to_string());
                     }
                     Err(err) => {
