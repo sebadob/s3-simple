@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.1
+
+- Removes an `.expect()` after a bad response from the S3 server during Multipart uploads, returns an error instead.
+- Lowered log level during failed StreamWriter tasks to avoid double `error` logs.
+
 ## v0.6.0
 
 You can now change the TLS provider via features. The default is still `rustls` with embedded root certs to not create a
