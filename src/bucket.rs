@@ -670,11 +670,23 @@ impl Bucket {
                 .brotli(true)
                 .connect_timeout(Duration::from_secs(10))
                 .tcp_keepalive(Duration::from_secs(30))
-                .pool_idle_timeout(Duration::from_secs(600))
-                .use_rustls_tls();
-            if env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true") {
-                builder = builder.danger_accept_invalid_certs(true);
+                .pool_idle_timeout(Duration::from_secs(600));
+
+            #[cfg(any(
+                feature = "rustls-tls",
+                feature = "rustls-tls-no-provider",
+                feature = "rustls-tls-manual-roots",
+                feature = "rustls-tls-webpki-roots",
+                feature = "rustls-tls-native-roots"
+            ))]
+            {
+                builder = builder.use_rustls_tls();
+
+                if env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true") {
+                    builder = builder.danger_accept_invalid_certs(true);
+                }
             }
+
             builder.build().unwrap()
         })
     }

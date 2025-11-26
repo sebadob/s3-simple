@@ -8,9 +8,9 @@ use base64::Engine;
 use std::env;
 
 /// S3 Bucket operations, your main entrypoint
-pub use crate::bucket::{Bucket};
+pub use crate::bucket::Bucket;
 /// Custom options for bucket connections
-pub use crate::bucket::{BucketOptions};
+pub use crate::bucket::BucketOptions;
 /// S3 Credentials
 pub use crate::credentials::{AccessKeyId, AccessKeySecret, Credentials};
 /// Specialized S3 Error type which wraps errors from different sources
@@ -37,7 +37,7 @@ impl Region {
     where
         S: Into<String>,
     {
-       Self(region.into())
+        Self(region.into())
     }
 
     pub fn try_from_env() -> Result<Self, S3Error> {
