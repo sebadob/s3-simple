@@ -1,8 +1,9 @@
 # Changelog
 
-## v0.6.2
+## v0.7.0
 
-Makes it possible to use the crate without any TLS at all by disabling default features.
+Makes it possible to use the crate without any TLS at all by disabling default features and the MSRV was bumped to 
+`1.83.0`.
 
 ## v0.6.1
 
