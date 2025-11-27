@@ -1,8 +1,8 @@
 [package]
 name = "s3-simple"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2021"
-rust-version = "1.82.0"
+rust-version = "1.83.0"
 authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
 license = "Apache-2.0"
 categories = ["api-bindings"]

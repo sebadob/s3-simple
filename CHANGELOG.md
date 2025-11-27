@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.0
+
+Makes it possible to use the crate without any TLS at all by disabling default features and the MSRV was bumped to 
+`1.83.0`.
+
 ## v0.6.1
 
 - Removes an `.expect()` after a bad response from the S3 server during Multipart uploads, returns an error instead.
