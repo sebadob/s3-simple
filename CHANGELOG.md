@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.2
+
+Makes it possible to use the crate without any TLS at all by disabling default features.
+
 ## v0.6.1
 
 - Removes an `.expect()` after a bad response from the S3 server during Multipart uploads, returns an error instead.
