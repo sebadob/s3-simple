@@ -101,11 +101,11 @@ impl Bucket {
     }
 
     pub fn try_from_env() -> Result<Self, S3Error> {
-        let host_env = env::var("S3_URL")?;
-        let host = host_env.parse::<Url>()?;
+        let region = Region::try_from_env().expect("Invalid AWS REGION");
+        let host_env = env::var("S3_URL").unwrap_or_else(|_| format!("https://s3.{s3region}.amazonaws.com", s3region=region.as_str())); 
+        let host = host_env.parse::<Url>().expect("The Url must be in the form https://s3.<your aws region>.amazonaws.com");
 
-        let name = env::var("S3_BUCKET")?;
-        let region = Region::try_from_env()?;
+        let name = env::var("S3_BUCKET").expect("Invalid s3 bucket name");
         let credentials = Credentials::try_from_env()?;
         let options = BucketOptions::default();
 
