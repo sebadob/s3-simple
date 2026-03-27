@@ -1,8 +1,14 @@
 # Changelog
 
+## v0.8.0
+
+Bumps several dependencies to fix some security vulnerabilities. There are breaking changes, somewhat, because of
+`reqwest` updates as well. The TLS features have been renamed to match `reqwest-0.13`. By default, `rustls` is used and
+the `webpkli-roots` are opt-in.
+
 ## v0.7.0
 
-Makes it possible to use the crate without any TLS at all by disabling default features and the MSRV was bumped to 
+Makes it possible to use the crate without any TLS at all by disabling default features and the MSRV was bumped to
 `1.83.0`.
 
 ## v0.6.1
@@ -51,7 +57,7 @@ This makes it possible to go from:
 ### old
 
 ```rust
-let bucket = Bucket::try_from_env()?;
+let bucket = Bucket::try_from_env() ?;
 
 // upload
 let res = bucket.put("test.txt", b"Hello S3").await?;
@@ -67,7 +73,7 @@ assert_eq!(body.as_ref(), b"Hello S3");
 ### new
 
 ```rust
-let bucket = Bucket::try_from_env()?;
+let bucket = Bucket::try_from_env() ?;
 
 // upload
 bucket.put("test.txt", b"Hello S3").await?;

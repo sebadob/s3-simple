@@ -666,25 +666,25 @@ impl Bucket {
 
     fn get_client<'a>() -> &'a reqwest::Client {
         CLIENT.get_or_init(|| {
+            let danger_accept_invalid =
+                env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true");
+
+            #[allow(unused_mut)]
             let mut builder = reqwest::Client::builder()
                 .brotli(true)
+                .tls_danger_accept_invalid_certs(danger_accept_invalid)
+                .tls_version_min(reqwest::tls::Version::TLS_1_2)
                 .connect_timeout(Duration::from_secs(10))
                 .tcp_keepalive(Duration::from_secs(30))
                 .pool_idle_timeout(Duration::from_secs(600));
 
-            #[cfg(any(
-                feature = "rustls-tls",
-                feature = "rustls-tls-no-provider",
-                feature = "rustls-tls-manual-roots",
-                feature = "rustls-tls-webpki-roots",
-                feature = "rustls-tls-native-roots"
-            ))]
+            #[cfg(feature = "webpki-roots")]
             {
-                builder = builder.use_rustls_tls();
-
-                if env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true") {
-                    builder = builder.danger_accept_invalid_certs(true);
-                }
+                builder = builder.tls_certs_merge(
+                    webpki_root_certs::TLS_SERVER_ROOT_CERTS
+                        .iter()
+                        .map(|c| reqwest::Certificate::from_der(c).unwrap()),
+                );
             }
 
             builder.build().unwrap()
