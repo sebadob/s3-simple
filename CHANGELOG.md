@@ -6,6 +6,8 @@ Bumps several dependencies to fix some security vulnerabilities. There are break
 `reqwest` updates as well. The TLS features have been renamed to match `reqwest-0.13`. By default, `rustls` is used and
 the `webpkli-roots` are opt-in.
 
+The MSRV was bumped to `1.88.0`.
+
 ## v0.7.0
 
 Makes it possible to use the crate without any TLS at all by disabling default features and the MSRV was bumped to
