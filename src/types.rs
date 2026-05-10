@@ -1,5 +1,6 @@
-use serde::Deserialize;
 use std::str::FromStr;
+
+use serde::Deserialize;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Multipart<'a> {

@@ -1,8 +1,11 @@
 #![allow(dead_code)]
 
+use std::{
+    env,
+    fmt::{Debug, Formatter},
+};
+
 use crate::error::S3Error;
-use std::env;
-use std::fmt::{Debug, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct AccessKeyId(pub String);

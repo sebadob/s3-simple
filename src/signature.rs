@@ -1,16 +1,16 @@
-use crate::constants::LONG_DATE_TIME;
-use crate::credentials::{AccessKeyId, AccessKeySecret};
-use crate::error::S3Error;
-use crate::Region;
 use bytes::BytesMut;
-use hmac::Hmac;
+use hmac::{Hmac, KeyInit};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-use reqwest::header::HeaderMap;
-use reqwest::Url;
-use sha2::digest::Mac;
-use sha2::{Digest, Sha256};
-use time::macros::format_description;
-use time::OffsetDateTime;
+use reqwest::{header::HeaderMap, Url};
+use sha2::{digest::Mac, Digest, Sha256};
+use time::{macros::format_description, OffsetDateTime};
+
+use crate::{
+    constants::LONG_DATE_TIME,
+    credentials::{AccessKeyId, AccessKeySecret},
+    error::S3Error,
+    Region,
+};
 
 const SHORT_DATE: &[time::format_description::BorrowedFormatItem<'static>] =
     format_description!("[year][month][day]");
@@ -258,11 +258,12 @@ pub fn authorization_header(
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
-    use std::str;
+    use std::{convert::TryInto, str};
 
-    use http::header::{HeaderName, HOST, RANGE};
-    use http::HeaderMap;
+    use http::{
+        header::{HeaderName, HOST, RANGE},
+        HeaderMap,
+    };
     use time::Date;
     use url::Url;
 

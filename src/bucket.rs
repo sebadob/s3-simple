@@ -1,27 +1,29 @@
-use crate::command::{Command, CompleteMultipartUploadData, Part};
-use crate::constants::LONG_DATE_TIME;
-use crate::credentials::Credentials;
-use crate::error::S3Error;
-use crate::types::Multipart;
-use crate::types::{
-    HeadObjectResult, InitiateMultipartUploadResponse, ListBucketResult, PutStreamResponse,
+use std::{env, fmt::Write, mem, sync::OnceLock, time::Duration};
+
+use hmac::{Hmac, KeyInit};
+use http::{
+    header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, DATE, HOST, RANGE},
+    HeaderMap, HeaderName, HeaderValue,
 };
-use crate::{md5_url_encode, signature, Region, S3Response, S3StatusCode};
-use hmac::Hmac;
-use http::header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, DATE, HOST, RANGE};
-use http::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::Response;
-use sha2::digest::Mac;
-use sha2::Sha256;
-use std::fmt::Write;
-use std::sync::OnceLock;
-use std::time::Duration;
-use std::{env, mem};
-use time::format_description::well_known::Rfc2822;
-use time::OffsetDateTime;
+use sha2::{digest::Mac, Sha256};
+use time::{format_description::well_known::Rfc2822, OffsetDateTime};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::{debug, error, warn};
 use url::Url;
+
+use crate::{
+    command::{Command, CompleteMultipartUploadData, Part},
+    constants::LONG_DATE_TIME,
+    credentials::Credentials,
+    error::S3Error,
+    md5_url_encode, signature,
+    types::{
+        HeadObjectResult, InitiateMultipartUploadResponse, ListBucketResult, Multipart,
+        PutStreamResponse,
+    },
+    Region, S3Response, S3StatusCode,
+};
 
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
@@ -666,17 +668,29 @@ impl Bucket {
 
     fn get_client<'a>() -> &'a reqwest::Client {
         CLIENT.get_or_init(|| {
-            let danger_accept_invalid =
-                env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true");
-
             #[allow(unused_mut)]
             let mut builder = reqwest::Client::builder()
                 .brotli(true)
-                .tls_danger_accept_invalid_certs(danger_accept_invalid)
-                .tls_version_min(reqwest::tls::Version::TLS_1_2)
                 .connect_timeout(Duration::from_secs(10))
                 .tcp_keepalive(Duration::from_secs(30))
                 .pool_idle_timeout(Duration::from_secs(600));
+
+            #[cfg(any(
+                feature = "rustls",
+                feature = "rustls-no-provider",
+                feature = "native-tls",
+                feature = "native-tls-no-alpn",
+                feature = "native-tls-vendored",
+                feature = "native-tls-vendored-no-alpn"
+            ))]
+            {
+                let danger_accept_invalid =
+                    env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true");
+
+                builder = builder
+                    .tls_danger_accept_invalid_certs(danger_accept_invalid)
+                    .tls_version_min(reqwest::tls::Version::TLS_1_2);
+            }
 
             #[cfg(feature = "webpki-roots")]
             {
@@ -976,10 +990,11 @@ impl Bucket {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use pretty_assertions::assert_eq;
     use tokio::fs;
     use tracing_test::traced_test;
+
+    use super::*;
 
     #[traced_test]
     #[tokio::test]
@@ -1102,8 +1117,9 @@ mod tests {
     #[traced_test]
     #[tokio::test]
     async fn test_multipart() -> Result<(), S3Error> {
-        use futures_util::stream::StreamExt;
         use std::os::unix::fs::MetadataExt;
+
+        use futures_util::stream::StreamExt;
         use tokio::io::AsyncWriteExt;
 
         dotenvy::dotenv().ok().unwrap();

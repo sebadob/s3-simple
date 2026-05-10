@@ -1,9 +1,10 @@
-use crate::constants::EMPTY_PAYLOAD_SHA;
-use crate::types::Multipart;
+use std::fmt;
+
 use http::HeaderMap;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::fmt;
+
+use crate::{constants::EMPTY_PAYLOAD_SHA, types::Multipart};
 
 #[derive(Debug, Serialize)]
 pub struct Part {

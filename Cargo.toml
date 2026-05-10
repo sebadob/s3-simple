@@ -1,6 +1,6 @@
 [package]
 name = "s3-simple"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 rust-version = "1.88.0"
 authors = ["Sebastian Dobe <sebastiandobe@mailbox.org>"]
@@ -17,7 +17,7 @@ doctest = false
 [features]
 default = ["rustls"]
 
-rustls = ["reqwest/rustls"]
+rustls = ["reqwest/rustls", "dep:rustls-webpki"]
 rustls-no-provider = ["reqwest/rustls-no-provider"]
 
 native-tls = ["reqwest/native-tls"]
@@ -28,40 +28,33 @@ native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
 webpki-roots = ["dep:webpki-root-certs"]
 
 [dependencies]
-base64 = "0.22.0"
+base64 = "0.22.1"
 bytes = "1.11.1"
-dotenvy = "0.15"
-flume = "0.12"
-futures-util = "0.3.30"
+flume = "0.12.0"
+futures-util = "0.3.32"
 hex = "0.4.3"
-hmac = "0.12.1"
-http = "1.1.0"
+hmac = "0.13.0"
+http = "1.4.0"
 md5 = "0.8.0"
-percent-encoding = "2.3.1"
-quick-xml = { version = "0.39", features = ["serialize"] }
-reqwest = { version = "0.13", default-features = false, features = [
+percent-encoding = "2.3.2"
+quick-xml = { version = "0.39.4", features = ["serialize"] }
+reqwest = { version = "0.13.3", default-features = false, features = [
     "charset",
     "http2",
     "brotli",
     "stream",
 ] }
-serde = { version = "1.0.197", features = ["derive"] }
-# update blocked by hmac
-sha2 = "0.10.9"
-thiserror = "2"
+serde = { version = "1.0.228", features = ["derive"] }
+sha2 = "0.11.0"
+thiserror = "2.0.18"
 time = { version = "0.3.47", features = ["formatting", "macros"] }
-tokio = { version = "1.37.0", features = ["fs", "macros", "time"] }
-tracing = { version = "0.1.37", features = ["attributes"] }
-url = "2.5.0"
-webpki-root-certs = { version = "1.0.6", optional = true }
-
-# Necessary to fix security issues in current versions.
-aws-lc-sys = "0.39"
-aws-lc-rs = "1.16.2"
-quinn = "0.11.9"
-quinn-proto = "0.11.14"
-rustls-webpki = "0.103.10"
+tokio = { version = "1.52.3", features = ["fs", "macros", "time"] }
+tracing = { version = "0.1.44", features = ["attributes"] }
+url = "2.5.8"
+webpki-root-certs = { version = "1.0.7", optional = true }
+rustls-webpki = { version = "0.103.13", optional = true }
 
 [dev-dependencies]
-pretty_assertions = "1.4.0"
-tracing-test = "0.2.4"
+dotenvy = "0.15.7"
+pretty_assertions = "1.4.1"
+tracing-test = "0.2.6"

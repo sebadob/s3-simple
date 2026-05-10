@@ -1,8 +1,11 @@
+use std::os::unix::fs::MetadataExt;
+
 use futures_util::stream::StreamExt;
 use s3_simple::*;
-use std::os::unix::fs::MetadataExt;
-use tokio::fs::{self, File};
-use tokio::io::AsyncWriteExt;
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), S3Error> {
