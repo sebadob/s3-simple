@@ -666,17 +666,29 @@ impl Bucket {
 
     fn get_client<'a>() -> &'a reqwest::Client {
         CLIENT.get_or_init(|| {
-            let danger_accept_invalid =
-                env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true");
-
             #[allow(unused_mut)]
             let mut builder = reqwest::Client::builder()
                 .brotli(true)
-                .tls_danger_accept_invalid_certs(danger_accept_invalid)
-                .tls_version_min(reqwest::tls::Version::TLS_1_2)
                 .connect_timeout(Duration::from_secs(10))
                 .tcp_keepalive(Duration::from_secs(30))
                 .pool_idle_timeout(Duration::from_secs(600));
+
+            #[cfg(any(
+                feature = "rustls",
+                feature = "rustls-no-provider",
+                feature = "native-tls",
+                feature = "native-tls-no-alpn",
+                feature = "native-tls-vendored",
+                feature = "native-tls-vendored-no-alpn"
+            ))]
+            {
+                let danger_accept_invalid =
+                    env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true");
+
+                builder = builder
+                    .tls_danger_accept_invalid_certs(danger_accept_invalid)
+                    .tls_version_min(reqwest::tls::Version::TLS_1_2);
+            }
 
             #[cfg(feature = "webpki-roots")]
             {
