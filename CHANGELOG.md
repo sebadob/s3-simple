@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.0
+
+Rust edition bumped to 2024 internally, and several dependencies to the latest versions.
+
 ## v0.8.0
 
 Bumps several dependencies to fix some security vulnerabilities. There are breaking changes, somewhat, because of
@@ -32,14 +36,14 @@ the MSRV was bumped to `1.82.0` as well.
 
 ## v0.4.1
 
-There is the new `copy_internal_from()` for a `Bucket`, which allows you to do an internal copy on the S3 storage from
-a different bucket (your key has access to) into the configured one. The already existing `copy_internal()` only allowed
+There is the new `copy_internal_from()` for a `Bucket`, which allows you to do an internal copy on the S3 storage from a
+different bucket (your key has access to) into the configured one. The already existing `copy_internal()` only allowed
 copies inside the same bucket.
 
 ## v0.4.0
 
-- make internal values for `AccessKeyId`, `AccessKeySecret` and `Region` `pub` for a better DX
-  when used without env vars
+- make internal values for `AccessKeyId`, `AccessKeySecret` and `Region` `pub` for a better DX when used without env
+  vars
 - added a `new()` fn for `Credentials`
 - clippy lints from latest Rust version have been applied
 - external deps have been updated
