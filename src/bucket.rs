@@ -6,19 +6,19 @@ use crate::types::Multipart;
 use crate::types::{
     HeadObjectResult, InitiateMultipartUploadResponse, ListBucketResult, PutStreamResponse,
 };
-use crate::{md5_url_encode, signature, Region, S3Response, S3StatusCode};
+use crate::{Region, S3Response, S3StatusCode, md5_url_encode, signature};
 use hmac::{Hmac, KeyInit};
 use http::header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, DATE, HOST, RANGE};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::Response;
-use sha2::digest::Mac;
 use sha2::Sha256;
+use sha2::digest::Mac;
 use std::fmt::Write;
 use std::sync::OnceLock;
 use std::time::Duration;
 use std::{env, mem};
-use time::format_description::well_known::Rfc2822;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc2822;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::{debug, error, warn};
 use url::Url;
@@ -141,10 +141,10 @@ impl Bucket {
         start: u64,
         end: Option<u64>,
     ) -> Result<S3Response, S3Error> {
-        if let Some(end) = end {
-            if start >= end {
-                return Err(S3Error::Range("start must be < than end"));
-            }
+        if let Some(end) = end
+            && start >= end
+        {
+            return Err(S3Error::Range("start must be < than end"));
         }
         self.send_request(Command::GetObjectRange { start, end }, path.as_ref())
             .await
@@ -666,17 +666,29 @@ impl Bucket {
 
     fn get_client<'a>() -> &'a reqwest::Client {
         CLIENT.get_or_init(|| {
-            let danger_accept_invalid =
-                env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true");
-
             #[allow(unused_mut)]
             let mut builder = reqwest::Client::builder()
                 .brotli(true)
-                .tls_danger_accept_invalid_certs(danger_accept_invalid)
-                .tls_version_min(reqwest::tls::Version::TLS_1_2)
                 .connect_timeout(Duration::from_secs(10))
                 .tcp_keepalive(Duration::from_secs(30))
                 .pool_idle_timeout(Duration::from_secs(600));
+
+            #[cfg(any(
+                feature = "rustls",
+                feature = "rustls-no-provider",
+                feature = "native-tls",
+                feature = "native-tls-no-alpn",
+                feature = "native-tls-vendored",
+                feature = "native-tls-vendored-no-alpn"
+            ))]
+            {
+                let danger_accept_invalid =
+                    env::var("S3_DANGER_ALLOW_INSECURE").as_deref() == Ok("true");
+
+                builder = builder
+                    .tls_danger_accept_invalid_certs(danger_accept_invalid)
+                    .tls_version_min(reqwest::tls::Version::TLS_1_2);
+            }
 
             #[cfg(feature = "webpki-roots")]
             {
