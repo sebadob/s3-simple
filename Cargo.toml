@@ -55,7 +55,6 @@ url = "2.5.0"
 webpki-root-certs = { version = "1.0.6", optional = true }
 
 # Necessary to fix security issues in current versions.
-aws-lc-sys = "0.39"
 aws-lc-rs = "1.16.2"
 quinn = "0.11.9"
 quinn-proto = "0.11.14"
