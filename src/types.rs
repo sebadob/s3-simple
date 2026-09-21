@@ -11,7 +11,11 @@ impl<'a> Multipart<'a> {
     pub fn query_string(&self) -> String {
         format!(
             "?partNumber={}&uploadId={}",
-            self.part_number, self.upload_id
+            self.part_number,
+            percent_encoding::percent_encode(
+                self.upload_id.as_bytes(),
+                percent_encoding::NON_ALPHANUMERIC
+            )
         )
     }
 
@@ -270,6 +274,9 @@ pub struct ListBucketResult {
 pub(crate) struct InitiateMultipartUploadResponse {
     #[serde(rename = "Bucket")]
     _bucket: String,
+    // Only used for logging/diagnostics; the upload itself targets the
+    // requested key (see `put_stream_with`).
+    #[allow(dead_code)]
     #[serde(rename = "Key")]
     pub key: String,
     #[serde(rename = "UploadId")]

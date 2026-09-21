@@ -18,9 +18,26 @@ impl fmt::Display for Part {
         write!(
             f,
             "<Part><PartNumber>{}</PartNumber><ETag>{}</ETag></Part>",
-            self.part_number, self.etag
+            self.part_number,
+            xml_escape_text(&self.etag)
         )
     }
+}
+
+/// Escape XML special characters for safe embedding in element text.
+/// The ETag is server-provided and untrusted, so it must not be able to
+/// inject markup into the CompleteMultipartUpload body.
+fn xml_escape_text(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for c in value.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 #[derive(Debug)]
@@ -178,5 +195,36 @@ impl<'a> Command<'a> {
             }
             _ => EMPTY_PAYLOAD_SHA.into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn part_escapes_xml_special_chars_in_etag() {
+        let part = Part {
+            part_number: 1,
+            etag: "a&b<c>d".into(),
+        };
+        assert_eq!(
+            part.to_string(),
+            "<Part><PartNumber>1</PartNumber><ETag>a&amp;b&lt;c&gt;d</ETag></Part>"
+        );
+    }
+
+    #[test]
+    fn complete_multipart_upload_escaping_is_consistent_with_len() {
+        let data = CompleteMultipartUploadData {
+            parts: vec![Part {
+                part_number: 1,
+                etag: "</ETag><ETag>&quot;injected&quot;</ETag>".into(),
+            }],
+        };
+        // len() must match the actual serialized body, which is what gets
+        // signed and sent.
+        assert_eq!(data.len(), data.to_string().len());
+        assert!(!data.to_string().contains("</ETag><ETag>"));
     }
 }

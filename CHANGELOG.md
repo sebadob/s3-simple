@@ -1,5 +1,12 @@
 # Changelog
 
+## UNRELEASED
+
+This release brings small tweaks:
+
+- When a sender stream got canceled mid-upload, it was possible to get into a deadlock situation.
+- A few protections against possibly hostile S3 servers were added.
+
 ## v0.9.0
 
 Rust edition bumped to 2024 internally, and several dependencies to the latest versions.

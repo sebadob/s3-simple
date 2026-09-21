@@ -27,6 +27,13 @@ static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 const CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MiB, min for S3 is 5MiB
 
+/// Messages passed from the streaming reader to the multipart writer task.
+enum StreamChunk {
+    Data(Vec<u8>),
+    End,
+    Error(std::io::Error),
+}
+
 #[derive(Debug)]
 pub struct BucketOptions {
     pub path_style: bool,
@@ -36,10 +43,7 @@ pub struct BucketOptions {
 impl Default for BucketOptions {
     fn default() -> Self {
         Self {
-            path_style: env::var("S3_PATH_STYLE")
-                .unwrap_or_else(|_| "false".to_string())
-                .parse::<bool>()
-                .expect("S3_PATH_STYLE cannot be parsed as bool"),
+            path_style: env::var("S3_PATH_STYLE").as_deref() == Ok("true"),
             list_objects_v2: true,
         }
     }
@@ -141,10 +145,10 @@ impl Bucket {
         start: u64,
         end: Option<u64>,
     ) -> Result<S3Response, S3Error> {
-        if let Some(end) = end
-            && start >= end
-        {
-            return Err(S3Error::Range("start must be < than end"));
+        // S3 byte ranges are inclusive on both ends, so `start == end` is a
+        // valid request for exactly one byte.
+        if let Some(end) = end && start > end {
+            return Err(S3Error::Range("start must be <= than end"));
         }
         self.send_request(Command::GetObjectRange { start, end }, path.as_ref())
             .await
@@ -355,7 +359,23 @@ impl Bucket {
 
             let msg = slf.initiate_multipart_upload(&path, extra_headers).await?;
             debug!("{:?}", msg);
-            let path = msg.key;
+            // The UploadId is server-generated and opaque, so there is no local
+            // value to compare it against; an empty one would silently corrupt
+            // every subsequent part request, so fail early.
+            if msg.upload_id.is_empty() {
+                return Err(S3Error::UnexpectedResponse(
+                    "empty UploadId in InitiateMultipartUpload response",
+                ));
+            }
+            if msg.key != path {
+                warn!(
+                    "server echoed a different Key (\"{}\" != \"{}\"); continuing against the requested key",
+                    msg.key, path
+                );
+            }
+            // Upload the parts and complete against the *requested* key, not
+            // the server-echoed one: a buggy or hostile server could otherwise
+            // redirect where the object lands.
             let upload_id = &msg.upload_id;
 
             let mut part_number: u32 = 0;
@@ -370,10 +390,17 @@ impl Bucket {
                     bytes
                 } else {
                     match rx.recv_async().await {
-                        Ok(Some(chunk)) => chunk,
-                        Ok(None) => {
+                        Ok(StreamChunk::Data(chunk)) => chunk,
+                        Ok(StreamChunk::End) => {
                             debug!("no more parts available in reader - finishing upload");
                             break;
+                        }
+                        Ok(StreamChunk::Error(err)) => {
+                            // The source stream failed mid-upload. Abort the
+                            // multipart upload and propagate the error instead
+                            // of blocking on the channel forever.
+                            slf.abort_upload(&path, upload_id).await?;
+                            return Err(S3Error::Io(err));
                         }
                         Err(err) => {
                             debug!("chunk reader channel has been closed: {}", err);
@@ -447,14 +474,14 @@ impl Bucket {
                 Ok(size) => {
                     if size == 0 {
                         debug!("stream reader finished reading");
-                        if let Err(err) = tx.send_async(None).await {
+                        if let Err(err) = tx.send_async(StreamChunk::End).await {
                             error!("sending the 'no more data' message in reader: {}", err);
                         }
                         break;
                     }
 
                     debug!("stream reader read {} bytes", size);
-                    if let Err(err) = tx.send_async(Some(buf)).await {
+                    if let Err(err) = tx.send_async(StreamChunk::Data(buf)).await {
                         warn!(
                             "Stream Writer has been closed before reader finished: {}",
                             err
@@ -464,6 +491,15 @@ impl Bucket {
                 }
                 Err(err) => {
                     error!("stream reader error: {}", err);
+                    // Tell the writer that the stream failed so it can abort
+                    // the upload instead of waiting for data that will never
+                    // come (which used to deadlock the whole call).
+                    if let Err(send_err) = tx.send_async(StreamChunk::Error(err)).await {
+                        error!(
+                            "sending the read error to the writer failed: {}",
+                            send_err
+                        );
+                    }
                     break;
                 }
             }
@@ -513,16 +549,28 @@ impl Bucket {
         delimiter: Option<&str>,
     ) -> Result<Vec<ListBucketResult>, S3Error> {
         let mut results = Vec::new();
-        let mut continuation_token = None;
+        let mut continuation_token: Option<String> = None;
 
         loop {
             let list_bucket_result = self
-                .list_page(prefix, delimiter, continuation_token, None, None)
+                .list_page(prefix, delimiter, continuation_token.clone(), None, None)
                 .await?;
-            continuation_token = list_bucket_result.next_continuation_token.clone();
+            let next_token = list_bucket_result.next_continuation_token.clone();
             results.push(list_bucket_result);
-            if continuation_token.is_none() {
-                break;
+
+            match next_token {
+                // A repeated token means the server will hand us the same page
+                // again: stop instead of looping forever. Without this guard a
+                // hostile or buggy server could DoS the caller with an
+                // unbounded results vector.
+                Some(token) if continuation_token.as_deref() == Some(token.as_str()) => {
+                    debug!("list pagination made no progress (repeated continuation token) - stopping");
+                    break;
+                }
+                Some(token) => {
+                    continuation_token = Some(token);
+                }
+                None => break,
             }
         }
 
@@ -569,11 +617,7 @@ impl Bucket {
         F: AsRef<str>,
         T: AsRef<str>,
     {
-        let fq_from = {
-            let from = from.as_ref();
-            let from = from.strip_prefix('/').unwrap_or(from);
-            format!("{}/{}", self.name, from)
-        };
+        let fq_from = build_copy_source(&self.name, from.as_ref());
         Ok(self
             .send_request(
                 Command::CopyObject {
@@ -598,11 +642,7 @@ impl Bucket {
         F: AsRef<str>,
         T: AsRef<str>,
     {
-        let fq_from = {
-            let from_object = from_object.as_ref();
-            let from_object = from_object.strip_prefix('/').unwrap_or(from_object);
-            format!("{}/{}", from_bucket.as_ref(), from_object)
-        };
+        let fq_from = build_copy_source(from_bucket.as_ref(), from_object.as_ref());
         Ok(self
             .send_request(
                 Command::CopyObject {
@@ -894,10 +934,14 @@ impl Bucket {
                 url.push_str("?uploads")
             }
             Command::AbortMultipartUpload { upload_id } => {
-                write!(url, "?uploadId={}", upload_id).expect("write! to succeed");
+                // The UploadId is server-provided; encode it so a hostile value
+                // cannot inject query parameters into the request.
+                write!(url, "?uploadId={}", signature::uri_encode(upload_id, false))
+                    .expect("write! to succeed");
             }
             Command::CompleteMultipartUpload { upload_id, .. } => {
-                write!(url, "?uploadId={}", upload_id).expect("write! to succeed");
+                write!(url, "?uploadId={}", signature::uri_encode(upload_id, false))
+                    .expect("write! to succeed");
             }
             Command::PutObject {
                 multipart: Some(multipart),
@@ -986,12 +1030,61 @@ impl Bucket {
     }
 }
 
+/// Build the `x-amz-copy-source` value for a copy request.
+///
+/// The S3 API requires the source object key to be URI-encoded (with `/`
+/// preserved as the path separator). Without encoding, characters such as
+/// spaces, non-ASCII bytes or `&` in the key would corrupt the header or
+/// inject query parameters into the copy source.
+fn build_copy_source(bucket: &str, from_object: &str) -> String {
+    let from_object = from_object.strip_prefix('/').unwrap_or(from_object);
+    format!("{}/{}", bucket, signature::uri_encode(from_object, false))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     use tokio::fs;
     use tracing_test::traced_test;
+
+    #[test]
+    fn test_build_copy_source_encodes_object_key() {
+        // spaces, `&` and non-ASCII must be percent-encoded; `/` is preserved
+        assert_eq!(
+            build_copy_source("my-bucket", "a b/c&d=é"),
+            "my-bucket/a%20b/c%26d%3D%C3%A9"
+        );
+        // a leading slash is stripped before encoding
+        assert_eq!(build_copy_source("b", "/key"), "b/key");
+    }
+
+    #[test]
+    fn build_url_encodes_server_provided_upload_id() {
+        let bucket = Bucket::new(
+            Url::parse("https://s3.example.com").unwrap(),
+            "my-bucket".into(),
+            crate::Region::new("us-east-1"),
+            crate::credentials::Credentials::new("ak", "sk"),
+            None,
+        )
+        .unwrap();
+
+        for command in [
+            Command::AbortMultipartUpload {
+                upload_id: "abc&partNumber=9".into(),
+            },
+            Command::CompleteMultipartUpload {
+                upload_id: "abc&partNumber=9".into(),
+                data: CompleteMultipartUploadData { parts: vec![] },
+            },
+        ] {
+            let url = bucket.build_url(&command, "key").unwrap();
+            // The UploadId must be percent-encoded so a hostile value cannot
+            // inject query parameters into the request.
+            assert!(url.as_str().ends_with("uploadId=abc%26partNumber%3D9"));
+        }
+    }
 
     #[traced_test]
     #[tokio::test]
